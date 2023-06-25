@@ -1,0 +1,402 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Mar 23 17:19:45 2023
+
+@author: Sigrid Aunsmo
+"""
+
+import numpy as np 
+import scipy as sp
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from tqdm import trange
+import functions as func 
+import save_and_load_data as data 
+plt.rcParams['font.size'] = 16
+plt.rcParams['figure.figsize'] = (6,4)
+
+
+
+'''filenames used''' 
+#filename = 'Josephson_junction_beta_prime_1000'
+#filename = 'Josephson_junction_beta_prime_5'
+#filename = 'Josephson_junction_beta_prime_100'
+#filename = 'Josephson_junction_beta_prime_10'
+#filename = 'Josephson_junction_beta_prime_50'
+filename = 'Josephson_junction_beta_prime_20'
+#filename = 'SN'
+#filename = 'Josephson_junction_beta_prime_1000_z0_075'
+# filename = 'test12juni'
+# filename = 'Josephson_junction_beta_prime_1000_2' #tried with linspace energy array.. that did not turn out well... 
+# filename = 'Josephson_junction_beta_prime_1000_3' #nE = 151
+# filename = 'Josephson_junction_beta_prime_1000_4' # nE = 301
+# filename = 'Josephson_junction_beta_prime_1000_5' # nE = 121
+#filename = 'Josephson_junction_beta_prime_10_2'
+# filename = 'Josephson_junction_beta_prime_1000_6' #new E list
+# filename = 'Josephson_junction_beta_prime_1000_7' #new E list
+filename = 'singlet_chargecurrent_T0'
+'''beta prime'''
+#beta_prime = 20
+z0 = 2
+
+def Es_array():
+    # E1 = np.linspace(0.0001,0.2,15)
+    # E2 = np.linspace(0.2001,0.9,15)
+    # E3 = np.linspace(0.9001,1.2,20)
+    # E4 = np.linspace(1.2001,3,5)
+    #return np.concatenate((E1,E2,E3,E4))   
+    # return np.linspace(0.001,3,301)
+    return np.concatenate((np.linspace(0.0001,0.07,30),np.linspace(0.08,1.5,70), np.linspace(1.6,3,20)))
+phis = np.linspace(0,2,29)*np.pi
+Es = Es_array()
+dE = np.zeros_like(Es)
+dE[0:-1] = Es[1:] - Es[:-1]
+
+'''Setting up all the general variables'''
+
+func.deltaE = 0.01 #1e-6   ##1e-3
+func.nx = 500
+func.L = 8
+func.nnodes = 1000 #max nodes for scipy solve_bvp 
+func.t = 1e-4 #tolerance for scipy solve_bvp 
+func.nm = 8
+yv_init = np.zeros((32,func.nx), dtype = complex)
+func.id2 = np.eye(2, dtype = complex)
+func.x = np.linspace(0,func.L,func.nx)
+func.Lh = 3
+
+'''spin active boundaries in case of triplet current'''
+#theta = 0*np.pi/2  #angle between the interface magnetizations
+#m = 10
+# func.m = m
+#func.mL = m*np.array([1,0,0])
+#func.mR = m*np.array([np.cos(theta), np.sin(theta), 0])
+#func.mL = m*np.array([1,0,0])
+#func.mR = m*np.array([0,1,0])
+#func.h0 = np.array([0,0,150])
+#G_0 = 10
+#func.G_0 = G_0
+#P = 0*0.12 #polarization 
+#func.G_phi = G_0*0.3
+#func.G_1  = G_0*( 1 - np.sqrt(1-P**2))/(1 + np.sqrt(1-P**2) )
+#func.G_MR = G_0* P /(1 + np.sqrt(1- P**2))
+# func.bc_left = func.bc_spin_active
+# func.bc_right = func.bc_spin_active
+'''KL boundaries in case of singlet current'''
+func.h0 = np.array([0,0,0])
+func.bc_left = func.bc_KL
+func.bc_right = func.bc_KL
+func.omega = 0.01
+'''SN parameters'''
+#func.bc_right = func.bc_KL
+#func.set_up_gmR(func, func.gm_vacum)
+
+'''Solving for material L'''
+# for i in trange(len(phis)): 
+#     phi = phis[i]
+#     func.phi = phi
+#     for j in range(len(Es)):
+#         func.E0 = Es[j]
+#         func.E = func.E0 + 1j*func.deltaE
+#         #func.b = func.calc_b(func.E/np.tanh(1.74*np.sqrt( beta_prime - 1 )))
+#         func.b = func.calc_b(func.E) # this one only for zero temperature
+#         func.tb = -func.b        
+#         func.set_up_gmL(func,func.gm_BCS, phi/2)
+#         func.set_up_gmR(func,func.gm_BCS, -phi/2)
+#         #func.set_up_gmR(func,func.gm_vacum) # only used in the SN case. 
+#         func.sovle_single_E_general(func,yv_init,f'{filename}_first_phi{i}_E{j}.npz')
+
+'''Saving the z0 solution from L to use in the boundary conditions for R'''
+# for i in trange(len(phis)):
+#     phi = phis[i]
+#     for j in range(len(Es)):
+#         E = Es[j]
+#         data1 = data.load_single_E(f'{filename}_first_phi{i}_E{j}.npz')
+#         middle_index_1 = int(len(data1.gm[0,0])/z0)  
+#         ym = data1.y
+#         np.save(f'data/{filename}_middle_phi{i}_E{j}.npy',ym[:,:,:,middle_index_1])    
+                   
+'''Rashba boundary conditions in the second material'''
+func.h0 = np.array([0,0,0])
+func.pref1 = 0.1
+func.pref2 = 0.1
+func.pref3 = 0.1
+func.omega = 0.1
+func.bc_left = func.Rashba_bc
+func.bc_right = func.bc_KL
+func.L = 8
+func.x = np.linspace(0,func.L,func.nx)
+
+'''Solving for material R'''
+# for i in trange(len(phis)): 
+#     phi = phis[i]
+#     func.phi = phi
+#     for j in range(len(Es)):
+#         E = Es[j]
+#         func.E0 = E
+#         func.E = E + 1j*func.deltaE
+#         #func.b = func.calc_b(func.E/np.tanh(1.74*np.sqrt( beta_prime - 1 )))
+#         func.b = func.calc_b(func.E) # this one only for zero temperature
+#         #func.tb = np.conj(func.calc_b(-func.E))
+#         func.tb = - func.b
+#         func.set_up_gmL_from_file(func,f'data/{filename}_middle_phi{i}_E{j}.npy')
+#         func.set_up_gmR(func,func.gm_vacum)
+#         func.sovle_single_E_general(func,yv_init,f'{filename}_sencond_phi{i}_E{j}.npz')
+
+    
+''' Finding relevant information from the second material '''
+# Mx = np.zeros((len(Es),len(phis),func.nx))
+# My = np.zeros((len(Es),len(phis),func.nx))
+# Mz = np.zeros((len(Es),len(phis),func.nx))            
+# fs2 = np.zeros((len(Es),len(phis)),dtype = complex)
+# dx2 = np.zeros((len(Es),len(phis)), dtype = complex)
+# for i in range(len(phis)):
+#     phi = phis[i]
+#     for j in range(len(Es)):
+#         E = Es[j]
+#         data2 = data.load_single_E(f'{filename}_sencond_phi{i}_E{j}.npz')
+#         ym = data2.y
+#         Mx[j,i] = data2.Mx#*np.tanh(1.76*beta_prime*E/2)
+#         My[j,i] = data2.My#*np.tanh(1.76*beta_prime*E/2)
+#         Mz[j,i] = data2.Mz#*np.tanh(1.76*beta_prime*E/2)
+#         fs2[j,i] = data2.fs[0]
+#         dx2[j,i] = data2.dx[0]
+# Mx_all_E = np.zeros((len(phis),func.nx))
+# My_all_E = np.zeros((len(phis),func.nx))
+# Mz_all_E = np.zeros((len(phis),func.nx))
+# for i in range(len(phis)):
+#     for j in range(func.nx):
+#         Mx_all_E[i,j] = sp.integrate.simps(Mx[:,i,j],Es)
+#         My_all_E[i,j] = sp.integrate.simps(My[:,i,j],Es)
+#         Mz_all_E[i,j] = sp.integrate.simps(Mz[:,i,j],Es)
+#         #Mx_all_E[i,j] = np.sum(Mx[:,i,j]*dE)
+# np.save(f'data/{filename}2_Mx0_all_E',Mx_all_E)
+# np.save(f'data/{filename}2_My0_all_E',My_all_E)
+# np.save(f'data/{filename}2_Mz0_all_E',Mz_all_E)
+# np.save(f'data/{filename}2_Mz',Mz)
+# np.save(f'data/{filename}2_My',My)
+# np.save(f'data/{filename}2_Mx',Mx)
+# np.save(f'data/{filename}2_fs2',fs2)
+# np.save(f'data/{filename}2_dx2',dx2)
+'''Loading the relevant information'''
+Mx_all_E = np.load(f'data/{filename}2_Mx0_all_E.npy')        
+My_all_E = np.load(f'data/{filename}2_My0_all_E.npy')
+Mz_all_E = np.load(f'data/{filename}2_Mz0_all_E.npy')
+Mz_all_E = np.load(f'data/{filename}2_Mz0_all_E.npy')
+Mz = np.load(f'data/{filename}2_Mz.npy')
+Mx = np.load(f'data/{filename}2_Mx.npy')
+My = np.load(f'data/{filename}2_My.npy')
+fs2 = np.load(f'data/{filename}2_fs2.npy')
+dx2 = np.load(f'data/{filename}2_dx2.npy')
+
+
+'''plotting abs(fs), abs(dx) as a function of phi'''
+E_ind1 = 54
+E_ind2 = 59
+E_ind3 = 80
+plt.figure()
+plt.plot(phis, np.abs(fs2[E_ind1]), color = cm.tab20c(0), label = fr'$f_s$({Es[E_ind1]:.2f})')
+plt.plot(phis, np.abs(fs2[E_ind2]),color = cm.tab20c(1), label = fr'$f_s$({Es[E_ind2]:.2f})')
+plt.plot(phis, np.abs(fs2[E_ind3]),color = cm.tab20c(2), label = fr'$f_s$({Es[E_ind3]:.2f})' )
+plt.plot(phis, np.abs(dx2[E_ind1]), color = cm.tab20c(4), label = fr'$d_x$({Es[E_ind1]:.2f})' )
+plt.plot(phis, np.abs(dx2[E_ind2]), color = cm.tab20c(5), label = fr'$d_x$({Es[E_ind2]:.2f})' )
+plt.plot(phis, np.abs(dx2[E_ind3]), color = cm.tab20c(6), label = fr'$d_x$({Es[E_ind3]:.2f})' )
+plt.xticks([0,np.pi/2, np.pi, 3*np.pi/2, 2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$', r'$3\pi/2$', r'$2\pi$'])
+plt.legend(loc = 'upper right')
+plt.xlabel(r'$\phi$')
+plt.ylim(0,np.max(np.abs(fs2[E_ind1]))*1.01)
+#plt.savefig("plots/singlet z0075 R fs dx.pdf", bbox_inches="tight", format="pdf")
+plt.show()
+
+'''plotting mx, my and mz as a function of phi'''
+plt.figure()
+plt.plot(phis, Mx_all_E[:,0], label = r'$M_x$')
+plt.plot(phis, My_all_E[:,0], label = r'$M_y$')
+plt.plot(phis, Mz_all_E[:,0],'--', label = r'$M_z$')
+plt.ylabel(r'$M/M_0$')
+plt.xlabel(r'$\phi$')
+plt.xticks([0,np.pi/2,np.pi,3*np.pi/2,2*np.pi],['0', r'$\pi/2$','$\pi$', '$3\pi/2$', r'$2\pi$'])
+plt.legend()
+#plt.savefig("plots/singlet Mx My Mz.pdf", bbox_inches="tight", format="pdf")
+plt.show()
+
+'''plotting Mx as a function of phi and y'''
+X,Y  = np.meshgrid(func.x, phis)
+Z = Mx_all_E
+Zmax = np.max(np.abs(Mx_all_E))
+plt.figure( )
+#plt.title('mx')
+plt.pcolormesh(X,Y,Z, vmin = - Zmax, vmax =  Zmax, cmap = cm.RdBu,rasterized=True)
+plt.yticks([0,np.pi/2,np.pi,3*np.pi/2,2*np.pi],['0', r'$\pi/2$','$\pi$', '$3\pi/2$', r'$2\pi$'])
+plt.xticks([0,4,8], ['0',r'$\ell/2$','$\ell$'])
+plt.ylabel(r'$\phi$')
+plt.xlabel(r'$y$')
+cbar = plt.colorbar()
+cbar.set_label(r'$M_x/M_0$')
+cbar.formatter.set_powerlimits((0, 0))
+plt.savefig("plots/singlet new T=0 Mx of phi and y.pdf", bbox_inches="tight", format="pdf")
+plt.savefig("plots/singlet new T=0 Mx of phi and y.svg", bbox_inches="tight", format="svg")
+plt.show()
+
+
+'''plotting dmx as a function of phi and y'''
+X,Y  = np.meshgrid(func.x, phis)
+E_ind = 21
+print(f'E  ={Es[E_ind]}')
+Z = Mx[E_ind]
+Zmax = np.max(np.abs(Z))
+fig  = plt.figure(figsize = (3,3) )
+plt.pcolormesh(X,Y,Z, vmin = - Zmax, vmax =  Zmax, cmap = cm.RdBu,rasterized=True)
+plt.yticks([0,np.pi/2,np.pi,3*np.pi/2,2*np.pi],['0', r'$\pi/2$','$\pi$', '$3\pi/2$', r'$2\pi$'])
+plt.xticks([0,4,8], ['0',r'$\ell/2$','$\ell$'])
+plt.ylabel(r'$\phi$')
+plt.xlabel(r'$y$')
+cbar = plt.colorbar()
+# cbar.set_ticks([-5e-6,0,5e-6])#,['-1','0','1'])
+#cbar.set_ticks([-1e-7,0,1e-7])#,['-1','0','1'])
+cbar.set_label(r'$M_x/M_0$')
+#ax = fig.gca()
+#ax.ticklabel_format(scilimits = (0,0))
+cbar.formatter.set_powerlimits((0, 0))
+#cbar.updata_ticks()
+plt.savefig(f"plots/singlet new T = 0 dMx of phi and y E = {Es[E_ind]}.pdf", bbox_inches="tight", format="pdf")
+plt.savefig(f"plots/singlet new T = 0 dMx of phi and y E = {Es[E_ind]}.svg", bbox_inches="tight", format="svg")
+plt.show()
+
+
+
+
+'''magnetization integrand as a function of E'''
+# #X, Y = np.meshgrid()
+# plt.figure()
+# plt.title('magnetization integrand')
+# plt.plot(Es,Mx[:,5,0])
+# #plt.yscale('log')
+# plt.show()
+
+
+'''Saving stuff from L'''
+# J = np.zeros((len(phis),len(Es),func.nx),dtype = complex)
+# Jsx = np.zeros((len(phis),len(Es),func.nx)) 
+# Jsy = np.zeros((len(phis),len(Es),func.nx))
+# Jsz = np.zeros((len(phis),len(Es),func.nx))
+# Jfs = np.zeros((len(phis),len(Es),func.nx)) 
+# Jdx = np.zeros((len(phis),len(Es),func.nx)) 
+# Jdy = np.zeros((len(phis),len(Es),func.nx)) 
+# Jdz = np.zeros((len(phis),len(Es),func.nx)) 
+# fs = np.zeros((len(phis),len(Es)), dtype = complex)
+# tfs = np.zeros((len(phis),len(Es)), dtype = complex)
+# dfs = np.zeros((len(phis),len(Es)), dtype = complex)
+# dtfs = np.zeros((len(phis),len(Es)), dtype = complex)
+# for i in range(len(phis)):
+#     phi = phis[i]
+#     for j in range(len(Es)):
+#         E = Es[j]
+#         data2 = data.load_single_E(f'{filename}_first_phi{i}_E{j}.npz')
+#         J[i,j] = data2.J_simp*np.tanh(1.76*beta_prime*Es[j]/2)
+#         J[i,j] = data2.J*np.tanh(1.76*beta_prime*Es[j]/2)
+#         Jfs[i,j] = data2.I_fs*np.tanh(1.76*beta_prime*Es[j]/2)
+#         Jdx[i,j] = data2.I_dx*np.tanh(1.76*beta_prime*Es[j]/2)
+#         Jdy[i,j] = data2.I_dy*np.tanh(1.76*beta_prime*Es[j]/2)
+#         Jdz[i,j] = data2.I_dz*np.tanh(1.76*beta_prime*Es[j]/2)
+#         Jsx[i,j] = data2.Jsx_simp*np.tanh(1.76*beta_prime*Es[j]/2)
+#         Jsy[i,j] = data2.Jsy_simp*np.tanh(1.76*beta_prime*Es[j]/2)
+#         Jsz[i,j] = data2.Jsz_simp*np.tanh(1.76*beta_prime*Es[j]/2)
+#         fs[i,j] = data2.fs[int(func.nx/z0)]
+#         tfs[i,j] = data2.tfs[int(func.nx/z0)]
+#         dfs[i,j] = data2.dfs[int(func.nx/z0)]
+#         dtfs[i,j] = data2.dtfs[int(func.nx/z0)]
+# Jsz_all_E = np.zeros((len(phis),func.nx))
+# Jsx_all_E = np.zeros((len(phis),func.nx))
+# Jsy_all_E = np.zeros((len(phis),func.nx))
+# J_all_E = np.zeros((len(phis),func.nx),dtype = complex) 
+# Jfs_all_E = np.zeros((len(phis),func.nx))
+# Jdx_all_E = np.zeros((len(phis),func.nx))
+# Jdy_all_E = np.zeros((len(phis),func.nx))
+# Jdz_all_E = np.zeros((len(phis),func.nx))
+# for i in range(len(phis)):
+#     for ni in range(func.nx):
+#         J_all_E[i,ni]   = sp.integrate.simps(  J[i,:,ni],Es,axis = 0)
+#         Jfs_all_E[i,ni] = sp.integrate.simps(Jfs[i,:,ni],Es,axis = 0)
+#         Jdx_all_E[i,ni] = sp.integrate.simps(Jdx[i,:,ni],Es,axis = 0)
+#         Jdy_all_E[i,ni] = sp.integrate.simps(Jdy[i,:,ni],Es,axis = 0)
+#         Jdz_all_E[i,ni] = sp.integrate.simps(Jdz[i,:,ni],Es,axis = 0)
+#         Jsz_all_E[i,ni] = sp.integrate.simps(Jsz[i,:,ni],Es,axis = 0)
+#         Jsx_all_E[i,ni] = sp.integrate.simps(Jsx[i,:,ni],Es,axis = 0)
+#         Jsy_all_E[i,ni] = sp.integrate.simps(Jsy[i,:,ni],Es,axis = 0)
+# np.save(f'data/{filename}_J_all_E',J_all_E)
+# np.save(f'data/{filename}_Jfs_all_E',Jfs_all_E)
+# np.save(f'data/{filename}_Jdx_all_E',Jdx_all_E)
+# np.save(f'data/{filename}_Jdy_all_E',Jdy_all_E)
+# np.save(f'data/{filename}_Jdz_all_E',Jdz_all_E)
+# np.save(f'data/{filename}_Jsx_all_E',Jsx_all_E)
+# np.save(f'data/{filename}_Jsy_all_E',Jsy_all_E)
+# np.save(f'data/{filename}_Jsz_all_E',Jsz_all_E)
+# np.save(f'data/{filename}_J',J)
+# np.save(f'data/{filename}_fs',fs)
+# np.save(f'data/{filename}_dfs',dfs)
+# np.save(f'data/{filename}_tfs',tfs)
+# np.save(f'data/{filename}_dtfs',dtfs)
+'''loading saved stuff from L'''
+# J_all_E = np.load(f'data/{filename}_J_all_E.npy')
+# Jfs_all_E = np.load(f'data/{filename}_Jfs_all_E.npy')
+# Jdx_all_E = np.load(f'data/{filename}_Jdx_all_E.npy')
+# Jdy_all_E = np.load(f'data/{filename}_Jdy_all_E.npy')
+# Jdz_all_E = np.load(f'data/{filename}_Jdz_all_E.npy')
+# Jsx_all_E = np.load(f'data/{filename}_Jsx_all_E.npy')
+# Jsy_all_E = np.load(f'data/{filename}_Jsy_all_E.npy')
+# Jsz_all_E = np.load(f'data/{filename}_Jsz_all_E.npy')
+# J = np.load(f'data/{filename}_J.npy')
+# fs = np.load(f'data/{filename}_fs.npy')
+# tfs = np.load(f'data/{filename}_tfs.npy')
+# dfs = np.load(f'data/{filename}_dfs.npy')
+# dtfs = np.load(f'data/{filename}_dtfs.npy') 
+
+
+'''plot abs(fs) and abs(delz fs) in L'''
+# plt.figure()
+# plt.plot(phis, np.abs(fs[:,E_ind1]), color = cm.tab20c(8), label = rf'$f_s$({Es[E_ind1]:.2f})')
+# plt.plot(phis, np.abs(fs[:,E_ind2]), color = cm.tab20c(9), label = rf'$f_s$({Es[E_ind2]:.2f})')
+# plt.plot(phis, np.abs(fs[:,E_ind3]), color = cm.tab20c(10), label = rf'$f_s$({Es[E_ind3]:.2f})')
+# plt.plot(phis, np.abs(dfs[:,E_ind1]), color = cm.tab20c(12), label = rf'$ \partial_z f_s$({Es[E_ind1]:.2f})')
+# plt.plot(phis, np.abs(dfs[:,E_ind2]), color = cm.tab20c(13), label = rf'$ \partial_z f_s$({Es[E_ind2]:.2f})')
+# plt.plot(phis, np.abs(dfs[:,E_ind3]), color = cm.tab20c(14), label = rf'$ \partial_z f_s$({Es[E_ind3]:.2f})')
+# plt.xticks([0,np.pi/2, np.pi, 3*np.pi/2, 2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$', r'$3\pi/2$', r'$2\pi$'])
+# plt.xlabel('$\phi$')
+# plt.ylim(0,np.max(np.abs(fs[:,E_ind1]))*1.01)
+# plt.legend(loc = 'upper right')
+# plt.savefig("plots/singlet R fs dfs.pdf", bbox_inches="tight", format="pdf")
+# plt.show()
+
+'''Plot mx as a function of alpha and phi'''
+# Mx_of_alpha = np.zeros((29,29,func.nx))
+# Mx_of_alpha[:] = Mx_all_E
+# X, Y = np.meshgrid(phis,phis)
+# Z = Mx_of_alpha[:,:,0]
+# Zmax = np.max(np.abs(Z))
+# plt.figure(figsize = (6,6))
+# plt.pcolormesh(X,Y,Z, vmin = - Zmax, vmax = Zmax, cmap  = cm.RdBu)
+# plt.xticks([0,np.pi/2,np.pi,3*np.pi/2,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3\pi/2$', r'$2\pi$'])
+# #plt.yticks([0,np.pi,2*np.pi], [r'$0$', r'$\pi$', r'$2\pi$'])
+# plt.yticks([0,np.pi/2,np.pi,3*np.pi/2,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3\pi/2$', r'$2\pi$'])
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$\alpha$')
+# cbar = plt.colorbar()
+# cbar.set_label(r'$M/M_0$')
+# plt.show()
+
+
+'''Plot current as a function of phi'''
+# plt.figure()
+# plt.plot(phis, J_all_E[:, int(len(J_all_E[0])/z0)])
+# plt.xticks([0,np.pi/2,np.pi,3*np.pi/2,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3\pi/2$', r'$2\pi$'])
+# plt.ylabel(r'$ J/J_0$')
+# plt.xlabel(r'$\phi$')
+# plt.savefig("plots/singlet J.pdf", bbox_inches="tight", format="pdf")
+# plt.show()
+
+
+
+
+
+

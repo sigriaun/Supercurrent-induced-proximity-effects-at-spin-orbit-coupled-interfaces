@@ -1,0 +1,1187 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu May  4 11:29:33 2023
+
+@author: Sigrid
+"""
+
+
+import numpy as np 
+import matplotlib.pyplot as plt
+import functions as func 
+import save_and_load_data as data 
+from matplotlib import cm
+import cmath as cmath 
+import matplotlib.colors as colors 
+import scipy as sp
+from tqdm import trange
+import cProfile as profile 
+import pstats 
+import time
+from matplotlib import rcParams
+from numba import jit 
+
+#from pathlib import Path
+#from matplotlib.figure import Figure
+
+
+
+rcParams['font.size'] = 16
+rcParams['figure.figsize'] = (6,4)
+#rcParams["mathtext.fontset"] 
+
+
+# rcParams['mathtext.fontset'] = 'custom'
+# rcParams['mathtext.rm'] = 'Bitstream Vera Sans'
+# rcParams['mathtext.it'] = 'Bitstream Vera Sans:italic'
+# rcParams['mathtext.bf'] = 'Bitstream Vera Sans:bold'
+
+#rcParams['mathtext.fontset'] = 'cm'
+#rcParams['font.family'] = 'sans-serif'
+#rcParams['mathtext.fontsize'] = 20
+def new_Es():
+    #E1 = np.linspace(0,0.2,15)
+    #E2 = np.linspace(0.2001,0.9,15)
+    #E3 = np.linspace(0.9001,1.2,20)
+    #E4 = np.linspace(1.2001,3,5)
+    #return np.concatenate((E1,E2,E3,E4))
+    return np.concatenate((np.linspace(0.0001,1.5,101), np.linspace(1.6,3,20)))
+
+def Es_Jacob():
+    E1 = np.linspace(0.0001,0.2,50)
+    E2 = np.linspace(0.2+1e-5,0.9,80)
+    E3 = np.linspace(0.9 +1e-5,1.1,50)
+    E4 = np.linspace(1.1+1e-5,3,150)
+    return np.concatenate((E1,E2,E3,E4))
+
+#@jit(nopython = True)
+def currents_of_alpha(ym,alpha):
+    gm,et,tgm,tet, N, tN = data.gamma_from_y(ym)
+    # gm = ym[0]
+    # tgm = ym[1]
+    # et = ym[2]
+    # tet = ym[3]
+    
+    fs, dx, dy, dz, tfs, tdx, tdy, tdz = data.calc_f_from_gamma(ym)
+    # I, ISx, ISy, ISz, I_simp, ISx_simp, ISy_simp, ISz_simp, dfs,ddx,ddy,ddz,dtfs,dtdx,dtdy,dtdz, I_fs, I_dx, I_dy, I_dz = data.currents(ym)
+    
+    df  = 2* np.einsum('ijk,jlk->ilk',N,np.einsum('ijk,jlk->ilk',et + np.einsum('ijk,jlk->ilk',gm,np.einsum('ijk,jlk->ilk',tet,gm)),tN)) 
+    dtf = 2* np.einsum('ijk,jlk->ilk',tN,np.einsum('ijk,jlk->ilk',tet + np.einsum('ijk,jlk->ilk',tgm,np.einsum('ijk,jlk->ilk',et,tgm)),N)) 
+    
+    dfs = 1/2*( df[0,1] - df[1,0] ) 
+    ddz = 1/2*( df[0,1] + df[1,0] )
+    ddx = 1/2*( -df[0,0]+ df[1,1] )
+    ddy = 1/(2*1j)*( df[0,0] + df[1,1])
+    dtfs = 1/2*( dtf[0,1] - dtf[1,0] ) 
+    dtdz = 1/2*( dtf[0,1] + dtf[1,0] )
+    dtdx = 1/2*( -dtf[0,0]+ dtf[1,1] )
+    dtdy = -1/(2*1j)*( dtf[0,0] + dtf[1,1])
+    
+    
+    # #print(gm)
+    # fs = 1/2*(gm[0,1]- gm[1,0])
+    # tfs = 1/2*(tgm[0,1]- tgm[1,0])
+    # dfs = 1/2*(et[0,1]- et[1,0])
+    # dtfs = 1/2*(tet[0,1]- tet[1,0])
+    
+    # gm_dx_old  = 1/2*(-gm[0,0] + gm[1,1])
+    # tgm_dx_old = 1/2*(-tgm[0,0] + tgm[1,1])
+    # et_dx_old  = 1/2*(-et[0,0] + et[1,1])
+    # tet_dx_old = 1/2*(-tet[0,0] + tet[1,1])
+    
+    # gm_dy_old  = -1j/2*(gm[0,0] + gm[1,1])
+    # tgm_dy_old = 1j/2*(tgm[0,0] + tgm[1,1])
+    # et_dy_old  = -1j/2*(et[0,0] + et[1,1])
+    # tet_dy_old = 1j/2*(tet[0,0] + tet[1,1])
+    
+    # gm_dx = gm_dx_old* np.cos(alpha) + gm_dy_old* np.sin(alpha)
+    # gm_dy = -gm_dx_old*np.sin(alpha) + gm_dy_old*np.cos(alpha)
+    
+    # tgm_dx = tgm_dx_old* np.cos(alpha) + tgm_dy_old* np.sin(alpha)
+    # tgm_dy = -tgm_dx_old*np.sin(alpha) + tgm_dy_old*np.cos(alpha)
+    
+    # et_dx = et_dx_old* np.cos(alpha) + et_dy_old* np.sin(alpha)
+    # et_dy = -et_dx_old*np.sin(alpha) + et_dy_old*np.cos(alpha)
+    
+    # tet_dx = tet_dx_old* np.cos(alpha) + tet_dy_old* np.sin(alpha)
+    # tet_dy = -tet_dx_old*np.sin(alpha) + tet_dy_old*np.cos(alpha)
+    
+    # J = - np.real( gm_dx*tet_dx - tgm_dx* et_dx  + gm_dy*tet_dy - tgm_dy* et_dy )  + np.real(fs *dtfs - tfs*dfs)
+    # Jsz = np.imag( gm_dx*tet_dy - gm_dy*tet_dx + tgm_dx*et_dy - tgm_dy * et_dx ) 
+    # Jdx = -np.real(gm_dx*tet_dx - tgm_dx* et_dx)
+    # #Jsz = gm_dx*tet_dy
+    
+    # Jfs = np.real(fs *dtfs - tfs*dfs)
+    
+    # fs_abs = np.abs(fs)
+    # #dx_abs = np.abs(dx)
+    # #dy_abs = np.abs(dy)
+    
+    dx_new = dx* np.cos(alpha) + dy* np.sin(alpha)
+    dy_new = -dx*np.sin(alpha) + dy*np.cos(alpha)
+    
+    tdx_new = tdx* np.cos(alpha) + tdy* np.sin(alpha)
+    tdy_new = -tdx*np.sin(alpha) + tdy*np.cos(alpha)
+    
+    ddx_new =  ddx*np.cos(alpha) + ddy* np.sin(alpha)
+    ddy_new = -ddx*np.sin(alpha) + ddy*np.cos(alpha)
+    
+    dtdx_new = dtdx* np.cos(alpha) + dtdy* np.sin(alpha)
+    dtdy_new = -dtdx*np.sin(alpha) + dtdy*np.cos(alpha)
+    
+    J = - np.real( dx_new*tdx_new - tdx_new* ddx_new  + dy_new*dtdy_new - tdy_new* ddy_new )  + np.real(fs *dtfs - tfs*dfs)
+    Jsz = np.imag( dx_new*dtdy_new - dy_new*dtdx_new + tdx_new*ddy_new - tdy_new * ddx_new ) 
+    Jdx = -np.real(dx_new*dtdx_new - tdx_new* ddx_new)
+    #Jsz = gm_dx*tet_dy
+    
+    Jfs = np.real(fs *dtfs - tfs*dfs)
+    
+    
+    return J, Jsz, Jdx, Jfs
+
+
+
+#filename = 'test1' #never ever override, this contains the P = 0, theta =0 run for all energies, all theta and all alpha E = Es_ew(), nalpha = nphi = 29 
+#filename = 'parllell_P0'
+#filename = 'orhtogonal_P0'
+#filename = 'theta0P012' #Es 55 nphi = 5 nalpha = 13
+#filename = 'testkjoretid'
+#filename = 'thetapi4P012'
+#filename = 'theta0P012_2929'
+#filename = 'thetapi2P012'
+#filename = 'thetapi2P012_changed_tolerance'
+#filename = 'JosephsonJunction'
+#filename = 'spinactive_without_exchange_field'
+#filename = 'weak_spinactive_without_exchange_field' #m=0.1, G_0 = 0.1 
+#filename = 'weak_spinactive_without_exchange_field2' #m=0.1, G_0 = 0.1, theta = pi2 
+#filename = 'thetapi4_P0'
+#filename = 'test'
+# filename = 'test_1'
+# filename = 'test2'
+# filename = 'test_3'
+# filename = 'test_4'
+# filename = 'test_5'
+#filename = 'P012_Gphi0_theta0'  
+#filename = 'P012_Gphi0_thetapi4'
+#filename = 'P012_Gphi03_theta0'
+#filename = 'smallP0theta0' #nphi = 5, nalpha = 5
+#filename = 'P012_Gphi0_theta0_2' # 2 refers to the new version where I save abs(fs,dx,dy,dz)
+
+#filename = 'PO12_Gphi_thet0' #Gphi = 0.3 
+# filename = 'PO12_Gphi0_theta0'  #tror jeg ødla denne.... 
+#filename = 'PO_Gphi03_theta0' #ødela...
+#filename = 'P0_Gphi03_theta0_G010' # nalpha = 9, nphi = 9
+#filename = 'test_1'
+#filename = 'ffind_params_later' 
+#filename = 'ffind_params_later_2' 
+#filename  = 'small_testing'
+#filename = 'PO_Gphi03_theta0' #denne har theta pi/4
+#filename = 'PO_Gphi03_theta0_actually'
+# filename = 'PO12_Gphi0_theta0'
+#filename = 'PO_Gphi03_theta0_actually_z07L'
+# filename = 'test11juni'
+# filename = 'PO_Gphi03_theta0_new_energies' # denne fungerer!! 
+# filename = 'PO_Gphi03_thetapi2_new_energies'
+#filename = 'PO_Gphi03_theta0_newnew_energies_test1' #actually pi/2
+# filename = 'PO_Gphi03_theta00_newnew_energies_test1'
+#filename = 'PO12_Gphi0_theta0_newnew_energies' 
+
+# filename = 'PO_Gphi03_thetapi2_new_energies'
+filename = 'PO_Gphi03_thetapi2_new_energies_z0L2'
+
+
+nalpha = 29
+nphi = 29
+# nalpha = 5
+# nphi = 5
+#
+alphas = np.pi*np.linspace(0,2,nalpha)
+
+phis = np.pi*np.linspace(0,2,nphi)
+# phis = np.array([np.pi/2])
+
+Es = new_Es()
+# Es = Es_Jacob()
+
+#Es = np.array([0.8,0.9])
+#Es = np.linspace(0.1,1.5,3)
+
+# print(alphas)
+# print(phis)
+G_0 = 1
+func.G_0 = G_0
+
+"""parameters for material (L)"""
+theta = 0*np.pi/2  #angle between the interface magnetizations
+P = 0.12 #polarization 
+func.G_phi = 0*G_0*0.3
+
+m = 10
+func.m = m
+func.mL = m*np.array([1,0,0])
+func.mR = m*np.array([np.cos(theta), np.sin(theta), 0])
+
+func.h0 = np.array([0,0,150])
+
+
+
+deltaE = 0.01
+func.nx = 500
+func.L = 8
+func.nnodes = 2000 #max nodes for scipy solve_bvp 
+func.t = 1e-4 #tolerance for scipy solve_bvp 
+func.nm = 8
+yv_init = np.zeros((func.nm*2*2,func.nx),dtype = complex)  #initial guess for soulution
+func.id2 = np.eye(2, dtype = complex)
+func.x = np.linspace(0,func.L,func.nx)
+x1 = func.x 
+func.Lh = 3
+func.G_1  = G_0*( 1 - np.sqrt(1-P**2))/(1 + np.sqrt(1-P**2) )
+func.G_MR = G_0* P /(1 + np.sqrt(1- P**2))
+func.bc_left = func.bc_spin_active
+func.bc_right = func.bc_spin_active
+nx1 = func.nx
+
+
+"""solve system in the material (L)"""
+# tstart = time.time()
+# for j in trange(len(phis)):
+#     phi = phis[j]
+#     for k in range(len(Es)):
+#         func.E = Es[k] + 1j*deltaE
+#         func.b = func.calc_b(func.E)
+#         func.tb = np.conj(func.calc_b(-func.E))
+#         func.set_up_gmL(func, func.gm_BCS, -phi/2)
+#         func.set_up_gmR(func, func.gm_BCS, phi/2)
+#         yv_init = func.sovle_single_E_general(func,yv_init,f'{filename}_L_phi{j}_E_{k}', save = 'only_y')
+# tend = time.time()
+# print(tend-tstart)                          
+               
+'''Save the middle of (L)'''
+# for j in trange(len(phis)):
+#     for k in range(len(Es)):
+#         y = np.load(f'data2/{filename1}_L_phi{j}_E_{k}_y.npy')
+#         ##y = np.load(f'data2/PO_Gphi03_theta0_actually_L_phi{j}_E_{k}_y.npy') # for endra L bare
+#         ym = func.v_to_m(y)
+        
+#         #print(int(func.nx/2))
+#         ym_middle = ym[:,:,:,int(func.nx/2) ]
+#         np.save( f'data2/{filename}_L_phi{j}_E_{k}_middle.npy', ym_middle)
+#         np.save(f'data2/{filename}_L_phi{j}_E_{k}_y.npy',y)
+        
+"""Parameters for material (R)"""
+func.t = 1e-4
+func.L = 8
+func.nx = 400
+func.x = np.linspace(0,func.L,func.nx)
+func.pref1 = 0.1
+func.pref2 = 0.1
+func.pref3 = 0.1
+func.omega = 0.1
+func.h0 = np.array([0,0,0])
+func.bc_left = func.Rashba_bc
+func.bc_right = func.bc_KL  
+func.set_up_gmR(func,func.gm_vacum)               
+yv_init = np.zeros((func.nm*2*2,func.nx),dtype = complex) 
+
+"""solve system in the material (R)"""
+# tstart = time.time()
+# for i in trange(len(alphas)):
+# #for i in trange(14,29):
+#     alpha = alphas[i]
+#     func.alpha = alphas[i]
+#     for j in range(len(phis)):
+#     # for j in range(4,29):
+#         phi = phis[j]
+#         yv_init = np.zeros((func.nm*2*2,func.nx),dtype = complex) 
+#         for k in range(len(Es)):
+#         # for k in trange(164,len(Es)):
+#             func.E = Es[k] + 1j*deltaE
+#             func.b = func.calc_b(func.E)
+#             func.tb = np.conj(func.calc_b(-func.E))
+#             func.set_up_gmL_from_file_alpha(func, f'data2/{filename}_L_phi{j}_E_{k}_middle.npy')
+#             yv_init_not = func.sovle_single_E_general(func,yv_init,f'{filename}_R_alpha{i}_phi{j}_E{k}', save = 'only_y')
+# tend = time.time()
+# print(tend-tstart)               
+# np.save(f'data2/{filename}_parameters',np.array([func.m, func.G_0,P,func.G_phi,deltaE,nx1,func.nx, func.L, func.nnodes, func.t,func.pref1, func.pref2, func.pref3]))
+
+# prof.disable()
+# stat = pstats. Stats(prof).strip_dirs().sort_stats('cumtime')
+# stat.print_stats(10)
+   
+
+
+'''current in (L)'''
+    # J_arr = np.zeros((len(Es), len(phis)))
+    # Jfs = np.zeros((len(Es), len(phis)))
+    # dx2 = np.zeros((len(Es), len(phis), 500 ), dtype = complex)
+    # ddx2 = np.zeros((len(Es), len(phis), 500 ), dtype = complex)
+    # dy2 = np.zeros((len(Es), len(phis), 500 ), dtype = complex)
+    # ddy2 = np.zeros((len(Es), len(phis), 500 ), dtype = complex)
+    # fs2 = np.zeros((len(Es), len(phis), 500 ), dtype = complex)
+    # dz2 = np.zeros((len(Es), len(phis), 500 ), dtype = complex)
+    # Jsz_arr = np.zeros((len(Es), len(phis)))
+    
+    # for k in range(len(Es)): 
+    #     for j in range(len(phis)): 
+    #         y = np.load( f'data2/{filename}_L_phi{j}_E_{k}_y.npy' )
+    #         ym = func.v_to_m(y)  
+    #         J, Jsx, Jsy, Jsz, I_simp, ISx_simp, ISy_simp, ISz_simp,dfs,ddx,ddy,ddz,dtfs,dtdx,dtdy,dtdz,I_fs, I_dx, I_dy, I_dz = data.currents(ym)
+    #         fsi, dxi, dyi, dzi, tfsi, tdxi, tdyi, tdzi  = data.calc_f_from_gamma(ym)
+    #         J_arr[k,j] = I_simp[int(len(J)/2)]
+    #         Jfs[k,j] = I_fs[int(len(J)/2)]
+    #         dx2[k,j] = dxi
+    #         ddx2[k,j] = ddx
+    #         dy2[k,j] = dyi
+    #         ddy2[k,j] = ddy
+    #         fs2[k,j] = fsi
+    #         dz2[k,j] = dzi
+    #         Jsz_arr[k,j] = ISz_simp[int(len(ISz_simp)/2)]
+            
+    
+    # J_arr_int = np.zeros(len(phis))
+    # Jfs_int = np.zeros(len(phis))
+    # Jsz_int = np.zeros(len(phis))
+    # for i in range(len(phis)):
+    #     J_arr_int[i] = sp.integrate.simps(J_arr[:,i],Es,axis = 0)
+    #     Jfs_int[i] = sp.integrate.simps(Jfs[:,i], Es, axis = 0)
+    #     Jsz_int[i] = sp.integrate.simps(Jsz_arr[:,i], Es, axis = 0)
+       
+    # np.save(f'{filename}_L_I.npy',J_arr_int)
+    # np.save(f'{filename}_L_Ifs.npy',Jfs_int)
+    # np.save(f'{filename}_L_dx.npy',dx2)
+    # np.save(f'{filename}_L_ddx.npy',ddx2)
+    # np.save(f'{filename}_L_dy.npy',dy2)
+    # np.save(f'{filename}_L_ddy.npy',ddy2)
+    # np.save(f'{filename}_L_dz.npy',dz2)
+    # np.save(f'{filename}_L_fs.npy',fs2)
+    # np.save(f'{filename}_L_Jsz.npy',Jsz_int)
+
+J_int = np.load(f'{filename}_L_I.npy')
+Jfs_int = np.load(f'{filename}_L_Ifs.npy')
+dx2 = np.load(f'{filename}_L_dx.npy')
+ddx2 = np.load(f'{filename}_L_ddx.npy')
+dy2 = np.load(f'{filename}_L_dy.npy')
+ddy2 = np.load(f'{filename}_L_ddy.npy')
+dz2 = np.load(f'{filename}_L_dz.npy')
+fs2 = np.load(f'{filename}_L_fs.npy')
+#Jsz = np.load(f'{filename}_L_Jsz.npy')
+
+plt.figure()
+plt.plot(phis,J_int/8,color = cm.Dark2(0), label = r'$J$')
+plt.plot(phis,Jfs_int,color = cm.Dark2(1), label = r'$J_{f_s}$')
+#plt.title('current')
+plt.xticks([0,np.pi/2, np.pi, 3*np.pi/2, 2*np.pi], ['0', r'$\pi/2$', r'$\pi$', r'$3\pi/2$', r'$2\pi$'])
+plt.xlabel(r'$\phi$')
+plt.ylabel(r'$J/J_0$')
+plt.legend()
+# plt.savefig("plots/triplet Gphi0 J.pdf", bbox_inches="tight", format="pdf")
+# plt.savefig("plots/triplet Gphi0 J.svg", bbox_inches="tight", format="svg")
+# plt.savefig("plots/triplet P0 J.pdf", bbox_inches="tight", format="pdf")
+# plt.savefig("plots/triplet P0 J.svg", bbox_inches="tight", format="svg")
+plt.savefig("plots/spin current J.pdf", bbox_inches="tight", format="pdf")
+plt.savefig("plots/spin current J.svg", bbox_inches="tight", format="svg")
+plt.show()
+
+X,Y = np.meshgrid(x1, phis)
+Z = np.abs(dx2[10])
+Zmax = np.max(Z) 
+plt.pcolormesh(X,Y,Z, vmin = 0, vmax = Zmax, cmap = cm.viridis,rasterized=True )
+cbar = plt.colorbar()
+cbar.formatter.set_powerlimits((0, 0))
+cbar.update_ticks()
+#plt.xticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+# plt.yticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+# plt.xticks([0,4,8], ['0','L/2','L'])
+plt.xticks([0,4,8], ['0',r'$\ell/2$','$\ell$'])
+# plt.yticks([0,np.pi,2*np.pi], [r'$0$', r'$\pi$',r'$2\pi$'])
+plt.yticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+plt.ylabel(r'$\phi$')
+plt.xlabel(r'$z$')
+# plt.savefig("plots/triplet abs dx.pdf", bbox_inches="tight", format="pdf")
+# plt.savefig("plots/test.pdf", bbox_inches="tight", format="pdf")
+plt.show() 
+
+# plt.figure()
+# plt.imshow(Z)
+# plt.colorbar()
+# plt.show()
+
+X,Y = np.meshgrid(x1, phis)
+Z = np.abs(ddx2[10])
+Zmax = np.max(np.abs(Z)) 
+fig = plt.figure()
+plt.pcolormesh(X,Y,Z , vmin = 0 ,vmax = Zmax, cmap = cm.viridis, rasterized=True )
+cbar = plt.colorbar()
+cbar.formatter.set_powerlimits((0, 0))
+cbar.update_ticks()
+#plt.xticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+plt.xticks([0,4,8], ['0',r'$\ell/2$','$\ell$'])
+#plt.yticks([0,np.pi,2*np.pi], [r'$0$', r'$\pi$',r'$2\pi$'])
+plt.yticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+plt.ylabel(r'$\phi$')
+plt.xlabel(r'$z$')
+#fn = Path('test.svg').expanduser()
+#fig.savefig(fn, bbox_inches='tight')
+#plt.savefig
+# plt.savefig("plots/triplet abs delz dx.pdf", bbox_inches="tight", format="pdf")
+plt.show()
+print('hei')
+'''plotting the spin current as a functoin of phi'''
+# plt.figure()
+# # plt.title('spin current')
+# plt.plot(phis, Jsz, color = cm.tab20b(12))
+# plt.xticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$J_{s_z}/J_{s0}$')
+# # plt.savefig("plots/spin current spin current.pdf", bbox_inches="tight", format="pdf")
+# # plt.savefig("plots/spin current spin current.svg", bbox_inches="tight", format="svg")
+# plt.show()
+
+
+# plt.figure()
+# plt.imshow(Z)
+# plt.colorbar()
+# plt.show()
+
+# X,Y = np.meshgrid(x1, phis)
+# Z = np.abs(fs2[10])
+# Zmaz = np.max(np.abs(Z)) 
+# plt.pcolormesh(X,Y,Z ) #, vmin = 0 ,vmax = Zmax, cmap = cm.Blues )
+# plt.colorbar()
+# plt.show()
+
+"""plotting the components on a logaritmmic scale"""
+
+E_ind = 10
+print(f'Energy = {Es[E_ind]}')
+plt.figure()
+plt.plot(x1,np.abs(fs2[E_ind,0]), label = r'abs($f_s$)', color = cm.Dark2(0) ) 
+plt.plot(x1,np.abs(dx2[E_ind,0]), label = r'abs($d_x$)', color = cm.Dark2(1) )
+#plt.plot(x1,np.abs(dy2[E_ind,0]), label = r'abs($d_y$)' )
+plt.plot(x1,np.abs(dz2[E_ind,0]), label = r'abs($d_z$)' , color = cm.Dark2(2)) 
+plt.xticks([0,4,8], ['0',r'$\ell/2$',r'$\ell$'])
+
+#plt.ylabel(r'$z$')
+plt.yscale('log')
+plt.legend(loc = 'upper right')
+# plt.savefig("plots/triplet abs L components.pdf", bbox_inches="tight", format="pdf")
+# plt.savefig("plots/triplet abs L components.svg", bbox_inches="tight", format="svg")
+plt.show()
+
+
+
+
+
+
+
+
+'''Collecting all the terms in (R)'''
+# fs = np.zeros((len(Es),len(alphas), len(phis), func.nx), dtype = complex)
+# dx =  np.zeros((len(Es),len(alphas), len(phis), func.nx), dtype = complex)
+# dy =  np.zeros((len(Es),len(alphas), len(phis), func.nx), dtype = complex)
+# tfs =  np.zeros((len(Es),len(alphas), len(phis), func.nx), dtype = complex)
+# tdx =  np.zeros((len(Es),len(alphas), len(phis), func.nx), dtype = complex)
+# tdy =  np.zeros((len(Es),len(alphas), len(phis), func.nx), dtype = complex)
+# ddx =  np.zeros((len(Es),len(alphas), len(phis), func.nx), dtype = complex)
+# dtdx =  np.zeros((len(Es),len(alphas), len(phis), func.nx), dtype = complex)
+# mx = np.zeros((len(Es),len(alphas), len(phis), func.nx))
+# my = np.zeros((len(Es),len(alphas), len(phis), func.nx))
+
+
+# for k in trange(len(Es)):
+#     for j in range(len(phis)):
+#         for i in range(len(alphas)):
+#             y = np.load(f'data2/{filename}_R_alpha{i}_phi{j}_E{k}_y.npy')
+            
+#             ym = func.v_to_m(y)
+#             gm = ym[0] + 1j*ym[4]
+#             tgm = ym[2] + 1j*ym[6]
+#             fsi, dxi, dyi, dzi, tfsi, tdxi, tdyi, tdzi  = data.calc_f_from_gamma(ym)
+            
+#             mx[k,i,j] = np.real(fsi*tdxi - tfsi*dxi) 
+#             my[k,i,j] = np.real(fsi*tdyi - tfsi*dyi)
+#             fs[k,i,j] = fsi
+#             dx[k,i,j] = dxi
+#             tfs[k,i,j] = tfsi
+            
+            
+            
+#             # N = np.zeros_like(gm)
+#             # tN = np.zeros_like(gm)
+#             # id2nx = np.zeros((2,2, func.nx),dtype=complex)
+#             # id2nx[0,0] = 1
+#             # id2nx[1,1] = 1
+#             # M = id2nx - np.einsum('ijk,jlk->ilk', gm, tgm)
+#             # Mdet = M[0,0]*M[1,1]-M[0,1]*M[1,0] 
+#             # N[0,0] = 1/Mdet * M[1,1]
+#             # N[1,1] = 1/Mdet * M[0,0]
+#             # N[1,0] = -1/Mdet * M[1,0]
+#             # N[0,1] = -1/Mdet * M[0,1]
+#             # tM = id2nx - np.einsum('ijk,jlk->ilk', tgm, gm)
+#             # tMdet = tM[0,0]*tM[1,1]-tM[0,1]*tM[1,0] 
+#             # tN[0,0] = 1/tMdet * tM[1,1]
+#             # tN[1,1] = 1/tMdet * tM[0,0]
+#             # tN[1,0] = -1/tMdet * tM[1,0]
+#             # tN[0,1] = -1/tMdet * tM[0,1]
+            
+#             # f = np.einsum('ijk,jlk->ilk',N,gm)
+#             # tf = np.einsum('ijk,jlk->ilk',tN,tgm)
+            
+#             # fs[k,i,j] = f[0,1] - f[1,0]
+#             # dx[k,i,j] = -f[0,0] + f[1,1]
+#             # tfs[k,i,j] = tf[0,1] - tf[1,0]
+#             # tdx[k,i,j] = - tf[0,0] + tf[1,1]
+#             # mx[k,i,j] = np.real(fs[k,i,j]*tdx[k,i,j] - tfs[k,i,j]*dx[k,i,j])
+           
+        
+# np.save(f'{filename}_2_fs', fs)
+# np.save(f'{filename}_2_dx', dx)
+# np.save(f'{filename}_2_mx', mx)
+# np.save(f'{filename}_2_my', my)
+
+fs = np.load(f'{filename}_2_fs.npy')
+dx = np.load(f'{filename}_2_dx.npy')
+mx = np.load(f'{filename}_2_mx.npy')
+my = np.load(f'{filename}_2_my.npy')
+
+
+
+'''plotting the absolute value of fs and dx'''
+E_ind = 10  
+X,Y = np.meshgrid(phis,alphas)
+Z = np.abs(fs[E_ind,:,:,0])
+Zmax = np.max(np.abs(Z))
+plt.figure()
+plt.pcolormesh(X,Y,Z,vmin = 0, vmax = Zmax, cmap = cm.viridis,rasterized=True)
+cbar = plt.colorbar()
+cbar.formatter.set_powerlimits((0, 0))
+cbar.update_ticks()
+#cbar.set_label(r'$|f_s|$')
+plt.yticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+plt.xticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+plt.ylabel(r'$\alpha$')
+plt.xlabel(r'$\phi$')
+#plt.savefig("plots/triplet z0075 R abs fs.pdf", bbox_inches="tight", format="pdf")
+plt.show()
+
+X,Y = np.meshgrid(phis,alphas)
+Z = np.abs(dx[E_ind,:,:,0])
+Zmax = np.max(np.abs(Z))
+plt.figure()
+plt.pcolormesh(X,Y,Z, vmin = 0, vmax = Zmax, cmap = cm.viridis,rasterized=True)
+cbar = plt.colorbar()
+cbar.formatter.set_powerlimits((0, 0))
+cbar.update_ticks()
+#cbar.set_label(r'$|d_x|$')
+plt.yticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+plt.xticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+plt.ylabel(r'$\alpha$')
+plt.xlabel(r'$\phi$')
+# plt.savefig("plots/triplet z0075 R abs dx .pdf", bbox_inches="tight", format="pdf")
+plt.show()
+
+# X,Y = np.meshgrid(phis,alphas)
+# Z = np.abs(dy[E_ind,:,:,0])
+# Zmax = np.max(np.abs(Z))
+# plt.figure()
+# plt.pcolormesh(X,Y,Z, vmin = 0, vmax = Zmax, cmap = cm.viridis)
+# cbar = plt.colorbar()
+# #cbar.set_label(r'$|d_x|$')
+# plt.yticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+# plt.xticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+# plt.ylabel(r'$\alpha$')
+# plt.xlabel(r'$\phi$')
+# plt.show()
+
+
+
+
+# X,Y = np.meshgrid(phis,alphas)
+# Z = dx[7,:,:,0]
+# Zmax = np.max(np.abs(Z))
+# plt.figure()
+# plt.pcolormesh(X,Y,Z,vmin = -Zmax, vmax = Zmax)
+'''integrate over E'''
+# mx_int = np.zeros((len(alphas), len(phis), func.nx))
+# my_int = np.zeros((len(alphas), len(phis), func.nx))
+
+# for j in range(len(phis)):
+#     for i in range(len(alphas)):
+#         for n in range(func.nx):
+#             mx_int[i,j,n] = sp.integrate.simps(mx[:,i,j,n], Es)
+#             my_int[i,j,n] = sp.integrate.simps(my[:,i,j,n], Es)
+# np.save(f'data2/{filename}_2_mx_int.npy',mx_int)
+# np.save(f'data2/{filename}_2_my_int.npy',my_int)
+
+
+mx_int = np.load(f'data2/{filename}_2_mx_int.npy')
+my_int = np.load(f'data2/{filename}_2_my_int.npy')
+
+'''plot integrated magnetization as a function of alpha and phi'''
+# X,Y = np.meshgrid(phis,alphas)
+# Z = mx_int[:,:,0]
+# Zmax = np.max(np.abs(Z))
+# plt.figure(figsize = (6,6))
+# plt.pcolormesh(X,Y,Z, vmin = -Zmax, vmax = Zmax, cmap = cm.RdBu)
+# plt.colorbar()
+# plt.show()
+
+
+
+
+'''plot (integrated) magnetizaton as a functoion of phi and y for differnt temperatures'''
+# alpha_ind = 7
+# X,Y = np.meshgrid(func.x,phis)
+# Z = mx_int[alpha_ind]
+# Zmax = np.max(np.abs(Z))
+# plt.pcolormesh(X,Y,Z, vmin = -Zmax, vmax = Zmax, cmap = cm.RdBu)
+# plt.colorbar()
+# plt.yticks([0,np.pi/2, np.pi, 3*np.pi/2, 2*np.pi], ['0', r'$\pi/2$', r'$\pi$', r'$3\pi/2$', r'$2\pi$'])
+# plt.xlabel(r'$y/\xi_s$')
+# plt.ylabel(r'$\phi$')
+# plt.show()
+
+
+
+
+
+#plt.show()
+
+# plt.figure()
+# plt.imshow( Mx[:,:,0].T, extent = (0,2*np.pi,0,2*np.pi) , vmin  = -1e-8, vmax = 1e-8 , cmap = cm.RdBu)
+# plt.colorbar()
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$\alpha$')
+# plt.title(r'$m_x$')
+# plt.show()
+
+
+'''Idx as a function alpa and phi'''
+# Idx_E = np.zeros((len(Es),len(phis),len(alphas)))
+# for k in trange(len(Es)):
+#     for j in range(len(phis)):
+#         y = np.load(f'data2/{filename}_L_phi{j}_E_{k}_y.npy')
+#         ym = data.v_to_m(y)
+#         for i in range(len(alphas)):
+#             #ym = np.load(f'data2/{filename}_L_phi{j}_E{k}_y.npy')
+#             J, Jszo, Jdx, Jfs = currents_of_alpha(ym,alphas[i])
+#             #J, Jsx, Jsy, Jszo, I_simp, ISx_simp, ISy_simp, ISz_simp,dfs,ddx,ddy,ddz,dtfs,dtdx,dtdy,dtdz,I_fs, I_dx, I_dy, I_dz = data.currents(ym)
+#             Idx_E[k,j,i] = Jdx[int(len(J)/2)]
+# Jdx = sp.integrate.simps(Idx_E,Es, axis = 0)
+
+
+# np.save(f'{filename}_L_Jdx_of_alpha.npy', Jdx)
+# np.save(f'{filename}_L_Jdx_integrand_of_alpha.npy', Idx_E)
+
+Jdx = np.load(f'{filename}_L_Jdx_of_alpha.npy')
+Jdx_E = np.load(f'{filename}_L_Jdx_integrand_of_alpha.npy')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'''plot integrand'''
+
+# # plt.figure()
+# # plt.plot(Es,Mx_integrand[:,13,0,0])
+# # plt.show()
+# func.x = np.linspace(0,func.L,200)
+# '''plot mx/my as a functon of phi and x'''
+# plt.figure( figsize = (6,6))
+# alpha_ind = 3
+# X, Y = np.meshgrid(phis,func.x)
+# #plt.title('mx as a function of phi and x')
+# Z = Mx[:,alpha_ind,:].T
+# Zmax = np.max(np.abs(Z))
+# plt.pcolormesh(X,Y,Z, vmin  = - Zmax, vmax = Zmax, cmap = cm.RdBu ) #, extent = (0, func.L,0, 2*np.pi, ))
+# cbar = plt.colorbar()
+# cbar.set_label(r'$M_x/M_0$')
+# plt.xticks([0,np.pi, 2*np.pi],['0',r'$\pi$', r'$2 \pi$'])
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$y/\xi_s$') 
+# plt.show()
+
+# plt.figure( figsize = (10,10))
+# alpha_ind = 0
+# plt.title('my as a function of phi and x')
+# plt.imshow(My[:,alpha_ind,:], vmin  = - np.max(np.abs(My[:,alpha_ind,:])), vmax = np.max(np.abs(My[:,alpha_ind,:])), aspect='auto', cmap = cm.RdBu ) #, extent = (0, func.L,0, 2*np.pi, ))
+# plt.colorbar()
+# plt.show()
+
+# plt.figure( figsize = (10,10))
+# alpha_ind = 0
+# E_ind = 6
+# plt.title('mx as a function of phi and x one enrgy alpha = 0 ')
+# plt.imshow(Mx_integrand[E_ind,:,alpha_ind,:], vmin  = - np.max(np.abs(Mx_integrand[E_ind,:,alpha_ind,:])), vmax = np.max(np.abs(Mx_integrand[E_ind,:,alpha_ind,:]))   , aspect='auto', cmap = cm.RdBu ) #, extent = (0, func.L,0, 2*np.pi, ))
+# plt.colorbar()
+# plt.show()
+
+# plt.title('my as a function of phi and x')
+# plt.imshow(My[:,alpha_ind,:], vmin  = - np.max(np.abs(My[:,alpha_ind,:])), vmax = np.max(np.abs(My[:,alpha_ind,:]))   , cmap = cm.RdBu,  aspect='auto', extent = (0, 2*np.pi, 0, func.L))
+# plt.colorbar()
+# plt.show()
+
+
+'''mx as a function of E and y'''
+# plt.figure(figsize = (10,10))
+# alpha_ind = 0
+# phi_ind = 7
+# mx_max = np.max(np.abs( Mx_integrand[:,phi_ind,alpha_ind]))*0.01
+# #plt.imshow(Mx_integrand[:,alpha_ind,phi_ind], )
+# X,Y = np.meshgrid(Es,func.x)
+# Z = Mx_integrand[:,phi_ind,alpha_ind]
+# plt.pcolormesh(X, Y, Z.T, vmin = -mx_max, vmax = mx_max, cmap = cm.RdBu)
+# plt.xlabel('E')
+# plt.ylabel('y')
+# plt.colorbar()
+# plt.show()
+
+# '''my as a function of E and y'''
+# plt.figure(figsize = (10,10))
+# alpha_ind = 3
+# phi_ind = 7
+# my_max = np.max(np.abs( My_integrand[:,phi_ind,alpha_ind]))*0.01
+# #plt.imshow(Mx_integrand[:,alpha_ind,phi_ind], )
+# X,Y = np.meshgrid(Es,func.x)
+# Z = My_integrand[:,phi_ind,alpha_ind]
+# plt.pcolormesh(X, Y, Z.T, vmin = -my_max, vmax = my_max, cmap = cm.RdBu)
+# plt.xlabel('E')
+# plt.ylabel('y')
+# plt.colorbar()
+# plt.show()
+
+
+
+
+# plt.figure()
+# plt.title('mx as a function of alpha and x')
+# plt.imshow(Mx[7,:,:], vmin  = - np.max(np.abs(Mx)), vmax = np.max(np.abs(Mx))   , cmap = cm.RdBu)
+# plt.colorbar()
+
+# plt.imshow(Mx_integrand[30,:,:,0].T, extent = (0,2*np.pi,0,2*np.pi) , vmin  = - np.max(np.abs(Mx_integrand[30,:,:,0].T)), vmax = np.max(np.abs(Mx_integrand[30,:,:,0].T))   , cmap = cm.RdBu)
+# plt.ylabel(r'$\phi$')
+# plt.xlabel(r'$\alpha$')
+# plt.colorbar()
+# plt.show()
+
+# #print(My_integrand[30,:,:,0].T)
+# plt.imshow(My_integrand[30,:,:,0].T, extent = (0,2*np.pi,0,2*np.pi), vmin  = - np.max(np.abs(My_integrand[30,:,:,0].T)), vmax = np.max(np.abs(My_integrand[30,:,:,0].T))   , cmap = cm.RdBu)
+# plt.ylabel(r'$\phi$')
+# plt.xlabel(r'$\alpha$')
+# plt.colorbar()
+# plt.show()
+
+# index1 = 29
+# plt.imshow(Mx_integrand[index1,:,:,0].T, extent = (0,2*np.pi,0,2*np.pi), vmin  = - np.max(np.abs(Mx_integrand[index1,:,:,0].T)), vmax = np.max(np.abs(Mx_integrand[index1,:,:,0].T))   , cmap = cm.RdBu)
+# plt.ylabel(r'$\phi$')
+# plt.xlabel(r'$\alpha$')
+# plt.colorbar()
+# plt.show()
+
+# plt.imshow(My_integrand[index1,:,:,0].T, extent = (0,2*np.pi,0,2*np.pi), vmin  = - np.max(np.abs(My_integrand[index1,:,:,0].T)), vmax = np.max(np.abs(My_integrand[index1,:,:,0].T))   , cmap = cm.RdBu)
+# plt.ylabel(r'$\phi$')
+# plt.xlabel(r'$\alpha$')
+# plt.colorbar()
+# plt.show()
+
+
+"""plotting the integrand for one  phi and one alpha"""
+# phii = 5
+# alphai = 3 
+# plt.figure()
+# plt.plot(Es,Mx_integrand[:,phii, alphai,0])
+# plt.title(f'Mx(E) at phi = {phis[phii]}  , alpha = {alphas[alphai]}, x= 0 ')
+# plt.xlabel('E')
+# plt.ylabel(r'$m_x$')
+# plt.show()
+
+
+"""integrating over the currents"""         
+# J_integrand = np.zeros((len(Es), len(phis), len(alphas)))
+# Jsz_integrand = np.zeros((len(Es), len(phis), len(alphas)))
+# Jdx_integrand = np.zeros((len(Es), len(phis), len(alphas)))
+# Jfs_integrand = np.zeros((len(Es), len(phis), len(alphas)))
+# J = np.zeros((len(phis),len(alphas)))
+# Jsz = np.zeros((len(phis),len(alphas)))
+# Jdx = np.zeros((len(phis),len(alphas)))
+# Jfs = np.zeros((len(phis),len(alphas)))
+# for k in trange(len(Es)):
+#     for j in range(len(phis)):
+#         for i in range(len(alphas)):
+#             #mx, my = data.load_mxmy(f'{filename}_R_alpha{i}_phi{j}_E{k}')
+#             ym = np.load(f'data2/{filename}_L_phi{j}_E_{k}_middle.npy')
+#             Ji, Jszi, Jdxi, Jfsi  = currents_of_alpha(ym, alphas[i])
+#             J_integrand[k,j,i] = Ji
+#             #print(Jszi)
+#             Jsz_integrand[k,j,i] = Jszi
+#             Jdx_integrand[k,j,i] = Jdxi   
+#             Jfs_integrand[k,j,i] = Jfsi   
+# J = sp.integrate.simps(J_integrand,Es,axis = 0)
+# Jsz = sp.integrate.simps(Jsz_integrand,Es,axis = 0)
+# Jdx = sp.integrate.simps(Jdx_integrand,Es,axis = 0)
+# Jfs = sp.integrate.simps(Jfs_integrand,Es,axis = 0)
+# np.save(f'data2/J_{filename}.npy', J)
+# np.save(f'data2/Jsz_{filename}.npy', Jsz)
+# np.save(f'data2/Jdx_{filename}.npy', Jdx)
+# np.save(f'data2/Jfs_{filename}.npy', Jfs)
+# np.save(f'data2/J_integrand_{filename}.npy', J_integrand)
+# np.save(f'data2/Jsz_integrand_{filename}.npy', Jsz_integrand)
+# np.save(f'data2/Jdx_integrand_{filename}.npy', Jdx_integrand)
+
+
+# Jfs = np.load(f'data2/Jfs_{filename}.npy')
+# J = np.load(f'data2/J_{filename}.npy')
+# Jsz = np.load(f'data2/Jsz_{filename}.npy')
+# Jdx = np.load(f'data2/Jdx_{filename}.npy')
+# J_integrand = np.load(f'data2/J_integrand_{filename}.npy')
+# Jsz_integrand = np.load(f'data2/Jsz_integrand_{filename}.npy')
+# Jdx_integrand = np.load(f'data2/Jdx_integrand_{filename}.npy')
+
+
+
+#plt.figure()
+
+# Jmax = np.max(np.abs(Jdx))
+# plt.figure()
+# plt.imshow(Jdx.T, extent = (0,2*np.pi,0,2*np.pi), vmin = - Jmax, vmax = Jmax, cmap = cm.PuOr)
+# plt.colorbar()
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$\alpha$')
+# plt.title(r'$J_{d_x}$')
+# plt.show()
+
+# plt.figure()
+# plt.imshow(Jsz.T, extent = (0,2*np.pi,0,2*np.pi), vmin = - np.max(np.abs(Jsz)), vmax = np.max(np.abs(Jsz)), cmap = cm.PuOr)
+# plt.colorbar()
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$\alpha$')
+# plt.title(r'$J_{s_z}$')
+# plt.show()
+
+'''plot the intgrand of spincurrent'''
+# X, Y = np.meshgrid(Es,phis)
+# plt.figure()
+#plt.plot(Es,Jsz[:,0,0])
+#plt.imshow(Jsz_integrand[:,:,0].T, vmin = - np.max(np.abs(Jsz_integrand[:,:,0])), vmax = np.max(np.abs(Jsz_integrand[:,:,0])), cmap = cm.PuOr) 
+# ax = plt.gca(projection = '3d')
+# surf = ax.plot_surface(X,Y,Jsz_integrand[:,:,0].T,cmap = cm.PuOr )
+# plt.colorbar()
+# plt.show()
+
+
+'''Jfs'''
+# Jfs_max = np.max(np.abs(Jfs))
+# plt.figure()
+# plt.imshow(Jfs.T, extent = (0,2*np.pi,0,2*np.pi), vmin = - Jfs_max, vmax = Jfs_max, cmap = cm.PuOr)
+# plt.colorbar()
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$\alpha$')
+# plt.title(r'$J_{f_s}$')
+# plt.show()
+
+
+
+
+'''plot the integrand of '''
+# plt.figure()
+# ax = plt.gca(projection = '3d')
+# surf = ax.plot_surface(X,Y,Mx_integrand[:,:,0,0].T,cmap = cm.PuOr )
+# plt.colorbar()
+# plt.show()
+
+# plt.figure()
+# plt.plot(phis,Jfs[:,0])
+# plt.show()
+
+# alpha_ind = 8
+# print(alphas[alpha_ind])
+# plt.plot(phis,Mx[:,alpha_ind,0])
+# plt.show()
+
+# plt.plot(phis,Jdx[:,alpha_ind])
+# plt.plot(phis,J[:,alpha_ind])
+# plt.show()
+
+# plt.plot(phis,My[:,alpha_ind,0])
+# plt.show()
+
+
+
+# X,Y = np.meshgrid(phis, alphas)
+"""The big subplot"""
+# plt.figure( figsize = (10,10))
+# plt.subplot(2,2,4)
+
+X,Y = np.meshgrid(phis,alphas)
+Z = mx_int[:,:,0]
+Zmax = np.max(np.abs(Z))
+plt.figure()
+#plt.subplot(2,2,3)
+#plt.imshow(Z, extent = (0,2*np.pi,0,2*np.pi), vmin = - np.max(np.abs(Mx)), vmax = np.max(np.abs(Mx)), cmap = cm.RdBu)
+plt.pcolormesh(X,Y,Z, vmin = -Zmax, vmax = Zmax, cmap = cm.RdBu,rasterized=True)
+cbar = plt.colorbar()
+cbar.set_label(r'$M_x/M_0$')
+plt.xlabel(r'$\phi$')
+plt.ylabel(r'$\alpha$')
+plt.yticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+plt.xticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+#plt.title(r'$m_x$')
+#plt.savefig("plots/triplet Gphi0 mx.pdf", bbox_inches="tight", format="pdf")
+# plt.savefig("plots/spin current mx.pdf", bbox_inches="tight", format="pdf")
+# plt.savefig("plots/spin current mx.svg", bbox_inches="tight", format="svg")
+plt.show()
+
+
+X,Y = np.meshgrid(phis,alphas)
+Z = my_int[:,:,0]
+Zmax = np.max(np.abs(Z))
+plt.figure()
+#plt.subplot(2,2,3)
+#plt.imshow(Z, extent = (0,2*np.pi,0,2*np.pi), vmin = - np.max(np.abs(Mx)), vmax = np.max(np.abs(Mx)), cmap = cm.RdBu)
+plt.pcolormesh(X,Y,Z, vmin = -Zmax, vmax = Zmax, cmap = cm.RdBu,rasterized=True)
+cbar =plt.colorbar()
+cbar.set_label(r'$M_y/M_0$')
+plt.xlabel(r'$\phi$')
+plt.ylabel(r'$\alpha$')
+plt.yticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+plt.xticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+#plt.savefig("plots/triplet Gphi0 my.pdf", bbox_inches="tight", format="pdf")
+# plt.savefig("plots/spin current my.pdf", bbox_inches="tight", format="pdf")
+# plt.savefig("plots/spin current my.svg", bbox_inches="tight", format="svg")
+#plt.title(r'$m_x$')
+plt.show()
+
+
+
+X,Y = np.meshgrid(phis,alphas)
+
+Z = Jdx.T
+Zmax = np.max(np.abs(Z))
+plt.figure()
+#plt.subplot(2,2,3)
+#plt.imshow(Z, extent = (0,2*np.pi,0,2*np.pi), vmin = - np.max(np.abs(Mx)), vmax = np.max(np.abs(Mx)), cmap = cm.RdBu)
+plt.pcolormesh(X,Y,Z, vmin = -Zmax, vmax = Zmax, cmap = cm.PuOr,rasterized=True)
+cbar =plt.colorbar()
+cbar.set_label(r'$J_{d_x}/J_0$')
+cbar.formatter.set_powerlimits((0, 0))
+cbar.update_ticks()
+plt.xlabel(r'$\phi$')
+plt.ylabel(r'$\alpha$')
+plt.yticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+plt.xticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+#plt.title(r'$m_x$')
+#plt.savefig("plots/triplet Gphi0 Jdx.pdf", bbox_inches="tight", format="pdf")
+# plt.savefig("plots/spin current Jdx.pdf", bbox_inches="tight", format="pdf")
+# plt.savefig("plots/spin current Jdx.svg", bbox_inches="tight", format="svg")
+plt.show()
+
+
+'''
+Plotting for one Energy
+'''
+# E_ind = 1
+
+# X,Y = np.meshgrid(phis,alphas)
+# Z = mx[E_ind,:,:,0]
+# Zmax = np.max(np.abs(Z))
+# plt.figure()
+# #plt.subplot(2,2,3)
+# #plt.imshow(Z, extent = (0,2*np.pi,0,2*np.pi), vmin = - np.max(np.abs(Mx)), vmax = np.max(np.abs(Mx)), cmap = cm.RdBu)
+# plt.pcolormesh(X,Y,Z, vmin = -Zmax, vmax = Zmax, cmap = cm.RdBu,rasterized=True)
+# cbar = plt.colorbar()
+# cbar.set_label(r'$M_x/M_0$')
+# plt.title(f'E = {Es[E_ind]}')
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$\alpha$')
+# plt.yticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+# plt.xticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+# #plt.title(r'$m_x$')
+# #plt.savefig("plots/triplet Gphi0 mx.pdf", bbox_inches="tight", format="pdf")
+# plt.show()
+
+
+# X,Y = np.meshgrid(phis,alphas)
+# Z = my[E_ind,:,:,0]
+# Zmax = np.max(np.abs(Z))
+# plt.figure()
+# plt.title(f'E = {Es[E_ind]}')
+# #plt.subplot(2,2,3)
+# #plt.imshow(Z, extent = (0,2*np.pi,0,2*np.pi), vmin = - np.max(np.abs(Mx)), vmax = np.max(np.abs(Mx)), cmap = cm.RdBu)
+# plt.pcolormesh(X,Y,Z, vmin = -Zmax, vmax = Zmax, cmap = cm.RdBu,rasterized=True)
+# cbar =plt.colorbar()
+# cbar.set_label(r'$M_y/M_0$')
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$\alpha$')
+# plt.yticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+# plt.xticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+# #plt.savefig("plots/triplet Gphi0 my.pdf", bbox_inches="tight", format="pdf")
+# #plt.title(r'$m_x$')
+# plt.show()
+
+
+
+# X,Y = np.meshgrid(phis,alphas)
+# Z = Jdx_E[E_ind].T
+# Zmax = np.max(np.abs(Z))
+# plt.figure()
+# plt.title(f'E = {Es[E_ind]}')
+# #plt.subplot(2,2,3)
+# #plt.imshow(Z, extent = (0,2*np.pi,0,2*np.pi), vmin = - np.max(np.abs(Mx)), vmax = np.max(np.abs(Mx)), cmap = cm.RdBu)
+# plt.pcolormesh(X,Y,Z, vmin = -Zmax, vmax = Zmax, cmap = cm.PuOr,rasterized=True)
+# cbar = plt.colorbar()
+# cbar.set_label(r'$J_{d_x}/J_0$')
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$\alpha$')
+# plt.yticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+# plt.xticks([0,np.pi/2,np.pi,3/2*np.pi,2*np.pi], [r'$0$',r'$\pi/2$', r'$\pi$',r'$3 \pi/2$',r'$2\pi$'])
+# #plt.title(r'$m_x$')
+# #plt.savefig("plots/triplet Gphi0 Jdx.pdf", bbox_inches="tight", format="pdf")
+# plt.show()
+
+
+
+
+
+# plt.figure()
+# plt.title('Jdx')
+# plt.plot(alphas/np.pi,Jdx[0])
+# plt.show()
+
+
+# plt.figure()
+# plt.title('mx')
+# plt.plot(alphas/np.pi,mx_int[:,0,0])
+# plt.show()
+
+
+# plt.figure()
+# plt.title('my')
+# plt.plot(alphas/np.pi,my_int[:,0,0])
+# plt.show()
+
+
+
+
+
+#print(len(Es))
+
+
+
+
+
+
+
+
+
+
+
+# plt.figure()
+# #plt.subplot(2,2,3)
+# plt.imshow(My[:,:,0].T, extent = (0,2*np.pi,0,2*np.pi), vmin = - np.max(np.abs(My)), vmax = np.max(np.abs(My)), cmap = cm.RdBu)
+# plt.colorbar()
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$\alpha$')
+# plt.title(r'$m_y$')
+# plt.show()
+
+# plt.figure()
+# #plt.subplot(2,2,2)
+# plt.imshow(Jdx.T, extent = (0,2*np.pi,0,2*np.pi), vmin = - np.max(np.abs(Jdx)), vmax = np.max(np.abs(Jdx)), cmap = cm.PuOr)
+# plt.colorbar()
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$\alpha$')
+# plt.title(r'$J_{d_x}$')
+# plt.show()
+
+# plt.subplot(4,2,1)
+# plt.plot(phis, J[:,0])
+# plt.title(r'$J$')
+# plt.subplot(4,2,3)
+# plt.plot(phis, Jsz[:,0])
+# plt.title(r'$J_{s_z}$')
+
+
+'''plot magnetization'''
+# plt.figure(figsize = (6,6))
+# Z = My[:,:,0].T 
+# Zmax = np.max(np.abs(Z))
+# plt.pcolormesh(X,Y, Z, vmin  = - Zmax, vmax = Zmax , cmap = cm.RdBu)
+# cbar = plt.colorbar()
+# cbar.set_label(r'$M/M_0$')
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$\alpha$')
+# plt.xticks([0,np.pi,2*np.pi], [r'$0$', r'$\pi$', r'$2\pi$'])
+# plt.yticks([0,np.pi,2*np.pi], [r'$0$', r'$\pi$', r'$2\pi$'])
+# #plt.title(r'$m_x$')
+
+'''plot Idx'''
+# plt.figure(figsize = (6,6))
+# Z = Jdx[:,:].T 
+# Zmax = np.max(np.abs(Z))
+# plt.pcolormesh(X,Y, Z, vmin  = - Zmax, vmax = Zmax , cmap = cm.PuOr)
+# cbar = plt.colorbar()
+# cbar.set_label(r'$J_{d_x}/J_0$')
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$\alpha$')
+# plt.xticks([0,np.pi,2*np.pi], [r'$0$', r'$\pi$', r'$2\pi$'])
+# plt.yticks([0,np.pi,2*np.pi], [r'$0$', r'$\pi$', r'$2\pi$'])
+
+
+'''plot J as a function of phi'''
+# plt.figure(figsize =(6,6))
+# plt.plot(phis,J[:,0])
+# plt.xticks([0,np.pi,2*np.pi], [r'$0$', r'$\pi$', r'$2\pi$'])
+# plt.xlabel(r'$\phi$')
+# plt.ylabel(r'$J/J_0$')
+
+'''plot absoulute value of fs,dx and dy'''        
+# fs_integrand = np.zeros((len(Es), len(phis), len(alphas), func.nx))
+# dx_integrand = np.zeros((len(Es), len(phis), len(alphas), func.nx))
+# dy_integrand = np.zeros((len(Es), len(phis), len(alphas), func.nx))
+# for k in trange(len(Es)):
+#     for j in range(len(phis)):
+#         for i in range(len(alphas)):
+#             #print('hi')
+#             mx, my, fs,dx, dy  = data.load_mxmy_fsdxdy(f'{filename}_R_alpha{i}_phi{j}_E{k}')
+#             fs_integrand[k,j,i] = fs
+#             dx_integrand[k,j,i] = dx
+#             dy_integrand[k,j,i] = dy
+
+# fs = sp.integrate.simps(Mx_integrand,Es,axis = 0)
+# dx = sp.integrate.simps(My_integrand,Es,axis = 0)
+# dy = sp.integrate.simps(My_integrand,Es,axis = 0)
+# np.save(f'data2/{filename}_fs_results.npy',fs)
+# np.save(f'data2/{filename}_dx_results.npy',dx)
+# np.save(f'data2/{filename}_dy_results.npy',dy)
+# np.save(f'data2/{filename}_fsintegrand_results.npy',fs_integrand)
+# np.save(f'data2/{filename}_dxintegrand_results.npy',dx_integrand)
+# np.save(f'data2/{filename}_dyintegrand_results.npy',dy_integrand)
+
+# fs = np.load(f'data2/{filename}_fs_results.npy')
+# dx = np.load(f'data2/{filename}_dx_results.npy')
+# dy = np.load(f'data2/{filename}_dy_results.npy')
+# fs_integrand = np.load(f'data2/{filename}_fsintegrand_results.npy')
+# dx_integrand = np.load(f'data2/{filename}_dxintegrand_results.npy')
+# dy_integrand = np.load(f'data2/{filename}_dyintegrand_results.npy')
+
+# X,Y = np.meshgrid(phis, alphas)
+# Z = fs[:,:,0]
+# Zmax = np.max(np.abs(Z))
+# plt.figure(figsize=(6,6))
+# plt.pcolormesh(X,Y,Z,vmin = -Zmax, vmax = Zmax, cmap = cm.BrBG)
+
+
+
+
+
